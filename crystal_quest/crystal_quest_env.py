@@ -22,9 +22,11 @@ action_table = [STOP,UP,DOWN,LEFT,RIGHT]
 class Wave1Env(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self,verbose=0):
+    def __init__(self,verbose=0,num_crystals=10,num_asteroids=5):
         self.viewer = None
         self.verbose = verbose
+        self.num_crystals = num_crystals
+        self.num_asteroids = num_asteroids
         # need to add a reward function..
 
         # create grid world
@@ -46,6 +48,9 @@ class Wave1Env(gym.Env):
         # or just 1D with ship =1, crystal=2, asteroid=3, alien=4
         # if ship and crystal occupy same spot, then it's ship, and reward +=1
         # if ship and asteroid/alien occupy the same spot then game over..
+
+        self.min_obj_loc = (.1*self.grid_size).astype(np.int)
+        self.max_obj_loc = (.9*self.grid_size).astype(np.int)
 
 
         
@@ -103,6 +108,8 @@ class Wave1Env(gym.Env):
             loc,vel = self._handle_vel(self.alien_locations[i],self.alien_velocities[i])
             self.alien_locations[i] = loc
             self.alien_velocities[i] = vel
+            if(np.random.rand() < .05):
+                self.alien_velocities[i] = self._random_vel()
             
 
         #Check if the player has hit crystals. Allow for multple crystals in same spot.
@@ -129,13 +136,23 @@ class Wave1Env(gym.Env):
 
         return self._internal_to_observation(), reward, end
 
+    def _random_points(self,low,high,num):
+        xs = np.random.randint(low[0],high[0],num).reshape((num,1))
+        ys = np.random.randint(low[1],high[1],num).reshape((num,1))
+        return np.concatenate([xs,ys],axis=1)
+    def _random_vel(self,mag=1.0):
+        vel = np.random.uniform(-1,1,2)
+        vel = mag*(vel/np.linalg.norm(vel))
+        # xs = np.random.randint(low[0],high[0],num).reshape((num,1))
+        # ys = np.random.randint(low[1],high[1],num).reshape((num,1))
+        return vel
     def _reset(self):
         self.ship_location = np.array(self.grid_size/2.0,dtype=np.int) # 1
-        self.alien_locations = np.array([[38,24],[0,24],[11,24]],dtype=np.float) #2 
-        self.alien_velocities = np.array([[-.5,-.75],[.5,.75],[.5,.75]],dtype=np.float) #2 
-        self.crystal_locations = np.array([(1,1),(6,4),(8,9),(15,17),(16,21)],dtype=np.int) #3 
-        self.asteroid_locations = np.array([(19,19),(15,22),(22,24),(30,23),(34,21),(7,4),(11,14)],dtype=np.int) #4
-        self.ship_velocity = UP
+        self.alien_locations = np.array([[38,24],[0,24]],dtype=np.float) #2 
+        self.alien_velocities = [self._random_vel() for _ in range(2)]
+        self.crystal_locations = self._random_points(self.min_obj_loc, self.max_obj_loc,10)#np.array([(1,1),(6,4),(8,9),(15,17),(16,21)],dtype=np.int) #3 
+        self.asteroid_locations = self._random_points(self.min_obj_loc, self.max_obj_loc,5) #4
+        self.ship_velocity = action_table[np.random.randint(1,5)] 
         gs = self.grid_size
         portals = np.array([[0,int(gs[1]/2)-1],
                             [0,int(gs[1]/2)+0],
