@@ -11,20 +11,20 @@ CRYSTAL =np.array([0.0,1.0,0.0,0.0])
 ASTEROID = np.array([0.0,0.0,1.0,0.0])
 ALIEN = np.array([0.0,0.0,0.0,1.0])
 
-STOP = np.array([0,0])
-UP = np.array([0,1])
-DOWN = np.array([0,-1])
-LEFT = np.array([-1,0])
-RIGHT = np.array([1,0])
+STOP = np.array([0,0]) # 0
+UP = np.array([0,-1]) # 1 
+DOWN = np.array([0,1]) # 2
+LEFT = np.array([-1,0]) # 3
+RIGHT = np.array([1,0]) # 4
 action_table = [STOP,UP,DOWN,LEFT,RIGHT]
 
 
 class Wave1Env(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self):
+    def __init__(self,verbose=0):
         self.viewer = None
-
+        self.verbose = verbose
         # need to add a reward function..
 
         # create grid world
@@ -39,6 +39,7 @@ class Wave1Env(gym.Env):
 
         self.action_space = spaces.Discrete(5)
         self.observation_space = spaces.Box(low=0, high=1, shape=(self.grid_size[0],self.grid_size[1],4))
+        self.gate_loc = np.array([self.grid_size[0]/2,self.grid_size[1]])
         # for now let's just move my guy around
         # may want to make 4D?
         # one for crystal, asteroid, alien, ship?
@@ -61,6 +62,26 @@ class Wave1Env(gym.Env):
     def _seed(self, seed=None):
         self.np_random, seed1 = seeding.np_random(seed)
 
+    def _handle_vel(self,loc,vel):
+        loc += vel#self.alien_velocities[i]
+        vx,vy = vel#self.alien_velocities[i]
+        x,y = loc
+        if(x < 0 or x >= self.grid_size[0]):
+            vx = -vx
+            if(x < 0):
+                x = 0
+            else:
+                x = self.grid_size[0]-1
+        elif(y < 0 or y >= self.grid_size[1]):
+            vy = -vy
+            if(y < 0):
+                y = 0
+            else:
+                y = self.grid_size[1]-1
+
+        return np.array([x,y]),np.array([vx,vy])
+
+
     def _step(self, action):
 
         # # get current state
@@ -70,80 +91,59 @@ class Wave1Env(gym.Env):
         # self.state[state_index]=0 # set old ships position to 0
 
         # update ship's location
-        self.ship_location += action_table[action]
-        self.ship_location = np.clip(self.ship_location,[0,0],[38,24])
+        # self.ship_location += action_table[action]
+        if(action != 0):
+            self.ship_velocity = action_table[action]
+        self.ship_location,self.ship_velocity = self._handle_vel(self.ship_location,self.ship_velocity)
+
+        # update all alien's locations
+        #TODO: Make aliens change direction randomly like in JS version
 
         for i in range(len(self.alien_locations)):
-            loc = self.alien_locations[i]
-            loc += self.alien_velocities[i]
-            vx,vy = self.alien_velocities[i]
-            x,y = loc
-            if(x < 0 or x >= self.grid_size[0]):
-                vx = -vx
-                if(x < 0):
-                    x = 0
-                else:
-                    x = self.grid_size[0]-1
-            elif(y < 0 or y >= self.grid_size[1]):
-                vy = -vy
-                if(y < 0):
-                    y = 0
-                else:
-                    y = self.grid_size[1]-1
-            self.alien_locations[i] = np.array([x,y])
-            self.alien_velocities[i] = np.array([vx,vy])
+            loc,vel = self._handle_vel(self.alien_locations[i],self.alien_velocities[i])
+            self.alien_locations[i] = loc
+            self.alien_velocities[i] = vel
             
 
-
-        # print(self.alien_locations)
-
-        # self.state[state_index]=1
-
-        
-
-        # update aliens location - which is just randomly taking steps
-
-        # NEED TO IMPLEMENT
+        #Check if the player has hit crystals. Allow for multple crystals in same spot.
         reward = 0
         inds = (self.ship_location == self.crystal_locations).nonzero()
         before = len(self.crystal_locations) 
         self.crystal_locations = np.array([c for c in self.crystal_locations if (c != self.ship_location).any()])
-        
         reward += before - len(self.crystal_locations)
-        # assert len(inds) <= 1
+        
+
+        #Check if the player has hit bad stuff or is at the gate
         end = 0
-        if(np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))):
+        hit_alien = np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))
+        hit_aster = np.sum((self.ship_location == self.asteroid_locations.astype(np.int)).all(axis=-1))
+        at_gate = np.abs(self.ship_location[0]-self.gate_loc[0]) < 1 and self.ship_location[1] >= self.grid_size[1]-1
+        if(self.verbose):
+            if(hit_alien): print("HIT ALIEN")
+            if(hit_aster): print("HIT ASTER")
+            if(at_gate): print("AT GATE")
+        cleared = len(self.crystal_locations) == 0 and at_gate
+        if(hit_alien or hit_aster or cleared):
             end = 1
-            # print(self.ship_location)
-            # print(self.alien_locations.astype(np.int))
-            # # print(np.sum())
-            # print((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))
-            # print(np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1)))
-
-
-
-        # self.state = 
-        # # if(self.ship_location in self.crystal_locations):
-        #     reward = 1
-        #     self.crystal_locations.
-
-
-        # if run into crystal increment reward..
-        
-        # NEED TO IMPLEMENT
-
-        # if run into alien or
-        
-        # NEED TO IMPLEMENT
+            
 
         return self._internal_to_observation(), reward, end
 
     def _reset(self):
-        self.ship_location = np.array([0,0],dtype=np.int) # 1
-        self.alien_locations = np.array([[38,24]],dtype=np.float) #2 
-        self.alien_velocities = np.array([[-.5,-.75]],dtype=np.float) #2 
+        self.ship_location = np.array(self.grid_size/2.0,dtype=np.int) # 1
+        self.alien_locations = np.array([[38,24],[0,24],[11,24]],dtype=np.float) #2 
+        self.alien_velocities = np.array([[-.5,-.75],[.5,.75],[.5,.75]],dtype=np.float) #2 
         self.crystal_locations = np.array([(1,1),(6,4),(8,9),(15,17),(16,21)],dtype=np.int) #3 
-        self.asteroid_locations = np.array([(19,19),(15,22),(22,24),(30,23),(34,21)],dtype=np.int) #4
+        self.asteroid_locations = np.array([(19,19),(15,22),(22,24),(30,23),(34,21),(7,4),(11,14)],dtype=np.int) #4
+        self.ship_velocity = UP
+        gs = self.grid_size
+        portals = np.array([[0,int(gs[1]/2)-1],
+                            [0,int(gs[1]/2)+0],
+                            [0,int(gs[1]/2)+1],
+                            [gs[0]-1,int(gs[1]/2)-1],
+                            [gs[0]-1,int(gs[1]/2)+0],
+                            [gs[0]-1,int(gs[1]/2)+1]],dtype=np.int) 
+        self.asteroid_locations = np.concatenate([self.asteroid_locations,portals],axis=0)
         return self._internal_to_observation()
 
     def _return_img(self):
@@ -162,6 +162,10 @@ class Wave1Env(gym.Env):
 
         xs, ys = self.alien_locations.astype(np.int).transpose()
         img[xs,ys] = np.array([1.0,0.0,0.0])
+
+        xs,ys = np.array([self.gate_loc+UP+2*LEFT,self.gate_loc+UP+2*RIGHT]).transpose()
+        img[xs,ys] = np.array([1.0,1.0,1.0])
+
         img = img.transpose()
         img = scipy.misc.imresize(img,500)
         return(img)
