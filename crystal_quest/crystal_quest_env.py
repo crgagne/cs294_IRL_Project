@@ -39,6 +39,7 @@ class Wave1Env(gym.Env):
 
         self.action_space = spaces.Discrete(5)
         self.observation_space = spaces.Box(low=0, high=1, shape=(self.grid_size[0],self.grid_size[1],4))
+        self.gate_loc = np.array([self.grid_size[0]/2,self.grid_size[1]])
         # for now let's just move my guy around
         # may want to make 4D?
         # one for crystal, asteroid, alien, ship?
@@ -112,29 +113,14 @@ class Wave1Env(gym.Env):
         reward += before - len(self.crystal_locations)
         # assert len(inds) <= 1
         end = 0
-        if(np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))):
+
+        hit_alien = np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))
+        hit_aster = np.sum((self.ship_location == self.asteroid_locations.astype(np.int)).all(axis=-1))
+        at_gate = np.abs(self.ship_location[0]-self.gate_loc[0]) < 2 and self.ship_location[1] >= self.grid_size[1]-1
+        finished = len(self.crystal_locations) == 0 and at_gate
+        if(hit_alien or hit_aster or finished):
             end = 1
-            # print(self.ship_location)
-            # print(self.alien_locations.astype(np.int))
-            # # print(np.sum())
-            # print((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))
-            # print(np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1)))
-
-
-
-        # self.state = 
-        # # if(self.ship_location in self.crystal_locations):
-        #     reward = 1
-        #     self.crystal_locations.
-
-
-        # if run into crystal increment reward..
-        
-        # NEED TO IMPLEMENT
-
-        # if run into alien or
-        
-        # NEED TO IMPLEMENT
+            
 
         return self._internal_to_observation(), reward, end
 
@@ -162,6 +148,11 @@ class Wave1Env(gym.Env):
 
         xs, ys = self.alien_locations.astype(np.int).transpose()
         img[xs,ys] = np.array([1.0,0.0,0.0])
+
+        xs,ys = [self.gate_loc+UP+LEFT,self.gate_loc+UP+RIGHT].transpose()
+        print(xs,ys)
+        img[xs,ys] = np.array([1.0,1.0,1.0])
+
         img = img.transpose()
         img = scipy.misc.imresize(img,500)
         return(img)
