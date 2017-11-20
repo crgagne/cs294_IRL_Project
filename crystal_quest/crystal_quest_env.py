@@ -12,7 +12,7 @@ ASTEROID = np.array([0.0,0.0,1.0,0.0])
 ALIEN = np.array([0.0,0.0,0.0,1.0])
 
 STOP = np.array([0,0]) # 0
-UP = np.array([0,-1]) # 1 
+UP = np.array([0,-1]) # 1
 DOWN = np.array([0,1]) # 2
 LEFT = np.array([-1,0]) # 3
 RIGHT = np.array([1,0]) # 4
@@ -53,7 +53,7 @@ class Wave1Env(gym.Env):
         self.max_obj_loc = (.9*self.grid_size).astype(np.int)
 
 
-        
+
 
     def _internal_to_observation(self):
         obs = np.zeros((self.grid_size[0],self.grid_size[1],4))
@@ -110,15 +110,15 @@ class Wave1Env(gym.Env):
             self.alien_velocities[i] = vel
             if(np.random.rand() < .05):
                 self.alien_velocities[i] = self._random_vel()
-            
+
 
         #Check if the player has hit crystals. Allow for multple crystals in same spot.
         reward = 0
         inds = (self.ship_location == self.crystal_locations).nonzero()
-        before = len(self.crystal_locations) 
+        before = len(self.crystal_locations)
         self.crystal_locations = np.array([c for c in self.crystal_locations if (c != self.ship_location).any()])
         reward += before - len(self.crystal_locations)
-        
+
 
         #Check if the player has hit bad stuff or is at the gate
         end = 0
@@ -132,7 +132,7 @@ class Wave1Env(gym.Env):
         cleared = len(self.crystal_locations) == 0 and at_gate
         if(hit_alien or hit_aster or cleared):
             end = 1
-            
+
 
         return self._internal_to_observation(), reward, end
 
@@ -148,18 +148,18 @@ class Wave1Env(gym.Env):
         return vel
     def _reset(self):
         self.ship_location = np.array(self.grid_size/2.0,dtype=np.int) # 1
-        self.alien_locations = np.array([[38,24],[0,24]],dtype=np.float) #2 
+        self.alien_locations = np.array([[38,24],[0,24]],dtype=np.float) #2
         self.alien_velocities = [self._random_vel() for _ in range(2)]
-        self.crystal_locations = self._random_points(self.min_obj_loc, self.max_obj_loc,10)#np.array([(1,1),(6,4),(8,9),(15,17),(16,21)],dtype=np.int) #3 
+        self.crystal_locations = self._random_points(self.min_obj_loc, self.max_obj_loc,10)#np.array([(1,1),(6,4),(8,9),(15,17),(16,21)],dtype=np.int) #3
         self.asteroid_locations = self._random_points(self.min_obj_loc, self.max_obj_loc,5) #4
-        self.ship_velocity = action_table[np.random.randint(1,5)] 
+        self.ship_velocity = action_table[np.random.randint(1,5)]
         gs = self.grid_size
         portals = np.array([[0,int(gs[1]/2)-1],
                             [0,int(gs[1]/2)+0],
                             [0,int(gs[1]/2)+1],
                             [gs[0]-1,int(gs[1]/2)-1],
                             [gs[0]-1,int(gs[1]/2)+0],
-                            [gs[0]-1,int(gs[1]/2)+1]],dtype=np.int) 
+                            [gs[0]-1,int(gs[1]/2)+1]],dtype=np.int)
         self.asteroid_locations = np.concatenate([self.asteroid_locations,portals],axis=0)
         return self._internal_to_observation()
 
@@ -181,6 +181,7 @@ class Wave1Env(gym.Env):
         img[xs,ys] = np.array([1.0,0.0,0.0])
 
         xs,ys = np.array([self.gate_loc+UP+2*LEFT,self.gate_loc+UP+2*RIGHT]).transpose()
+
         img[xs,ys] = np.array([1.0,1.0,1.0])
 
         img = img.transpose()
