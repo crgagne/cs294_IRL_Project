@@ -23,7 +23,7 @@ action_table = [NONE,UP,DOWN,LEFT,RIGHT]
 
 
 class Wave1Env(gym.Env):
-    metadata = {'render.modes': ['human']}
+    metadata = {'render.modes': ['human','rgb_array']}
 
     def __init__(self,verbose=0,
                     num_crystals=10,
@@ -42,7 +42,7 @@ class Wave1Env(gym.Env):
         self.max_steps = max_steps
         self.crystal_value = crystal_value
         self.death_value = death_value
-    
+
         self.grid_size = (np.array(screen_dim)/discretize_size).astype('int')
 
         self.all_points = np.array([[(x,y) for x in range(self.grid_size[0])] for y in range(self.grid_size[1])],dtype=np.int).reshape(-1,2)
@@ -53,7 +53,8 @@ class Wave1Env(gym.Env):
         self._seed()
 
         self.action_space = spaces.Discrete(5)
-        self.observation_space = spaces.Box(low=0, high=1, shape=(self.grid_size[0],self.grid_size[1],4))
+        self.observation_space = spaces.Box(low=0, high=1, shape=(self.grid_size[0],self.grid_size[1],1))
+
         # self.gate_loc = np.array([self.grid_size[0]/2,self.grid_size[1]])
         # for now let's just move my guy around
         # may want to make 4D?
@@ -68,11 +69,26 @@ class Wave1Env(gym.Env):
 
 
     def _internal_to_observation(self):
-        obs = np.zeros((self.grid_size[0],self.grid_size[1],4))
-        obs[self.crystal_locations.astype(np.int)] = CRYSTAL
-        obs[self.ship_location.astype(np.int)] = SHIP
-        obs[self.asteroid_locations.astype(np.int)] = ASTEROID
-        obs[self.alien_locations.astype(np.int)] = ALIEN
+        #obs = np.zeros((self.grid_size[0],self.grid_size[1],4))
+        #obs[self.crystal_locations.astype(np.int)] = CRYSTAL
+        #obs[self.ship_location.astype(np.int)] = SHIP
+        #obs[self.asteroid_locations.astype(np.int)] = ASTEROID
+        #obs[self.alien_locations.astype(np.int)] = ALIEN
+        # this doesn't work?
+        # it returns a grid with lines across it, not things in individual locations.
+
+        # also we want a 2D observation space for teh DQN
+        # the uint8 is for the dqn function (saves memory)
+        obs = np.zeros((self.grid_size[0],self.grid_size[1],1),dtype='uint8')
+        xs, ys = self.ship_location.transpose()
+        obs[xs,ys] = 60
+        xs, ys = self.crystal_locations.transpose()
+        obs[xs,ys] = 120
+        xs, ys = self.asteroid_locations.transpose()
+        obs[xs,ys] = 180
+        xs, ys = self.alien_locations.astype(np.int).transpose()
+        obs[xs,ys] = 240
+        # 0.0 color will be empty space.
         return obs
 
 
@@ -118,9 +134,9 @@ class Wave1Env(gym.Env):
         #Check for collisions with crystals
         inds, = (self.ship_location == self.crystal_locations).all(axis=-1).nonzero()
         if(len(inds) > 0):
-            self.crystal_locations[inds] = self._random_points(len(inds),self.acceptable_points)                
+            self.crystal_locations[inds] = self._random_points(len(inds),self.acceptable_points)
             reward += len(inds)*self.crystal_value
-        
+
         #Check for collisions with bad stuff
         hit_alien = np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))
         hit_aster = np.sum((self.ship_location == self.asteroid_locations.astype(np.int)).all(axis=-1))
@@ -133,11 +149,12 @@ class Wave1Env(gym.Env):
 
         #Tick
         self.steps_taken += 1
-        return self._internal_to_observation(), reward, end
+        return self._internal_to_observation(), reward, end, {'misc info': None}
+        #return self._return_img(100), reward, end
 
     def _random_points(self,num,select_from):
-        return select_from[np.random.choice(np.arange(len(select_from)),num,replace=False)] 
-    
+        return select_from[np.random.choice(np.arange(len(select_from)),num,replace=False)]
+
     def _reset(self):
         self.ship_location = np.array([0,0],dtype=np.int) # 1
         self.alien_locations = np.array([[38,24],[0,24]],dtype=np.float) #2
@@ -150,7 +167,7 @@ class Wave1Env(gym.Env):
         self.steps_taken = 0
         return self._internal_to_observation()
 
-    def _return_img(self):
+    def _return_img(self,resize=600):
         # img = self.state
         img = np.zeros((self.grid_size[0],self.grid_size[1],3))
 
@@ -168,7 +185,7 @@ class Wave1Env(gym.Env):
         img[xs,ys] = np.array([1.0,0.0,0.0])
 
         img = img.transpose()
-        img = scipy.misc.imresize(img,500)
+        img = scipy.misc.imresize(img,resize)
         return(img)
 
     def _render(self, mode='human', close=False):
@@ -180,6 +197,10 @@ class Wave1Env(gym.Env):
 
         img = self._return_img()
 
+       # needed for gym's video recorder
+        if mode == 'rgb_array':
+            #img = self._internal_to_observation()[:,:,0]
+            return img
 
         if mode == 'human':
             from gym.envs.classic_control import rendering
