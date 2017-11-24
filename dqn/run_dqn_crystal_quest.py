@@ -32,8 +32,9 @@ def cq_model(img_in, num_actions, scope, reuse=False):
             #out = layers.convolution2d(out, num_outputs=64, kernel_size=2, stride=1, activation_fn=tf.nn.relu)
 
         out = layers.flatten(out)
+        # print(num)
         with tf.variable_scope("action_value"):
-            #out = layers.fully_connected(out, num_outputs=512,         activation_fn=tf.nn.relu)
+            out = layers.fully_connected(out, num_outputs=512,         activation_fn=tf.nn.relu)
             out = layers.fully_connected(out, num_outputs=num_actions, activation_fn=None)
 
         return out
@@ -44,7 +45,7 @@ def cq_learn(env,
     # This is just a rough estimate
     num_iterations = float(num_timesteps) / 4.0
 
-    lr_multiplier = 1.0
+    lr_multiplier = 2.0
     lr_schedule = PiecewiseSchedule([
                                          (0,                   1e-4 * lr_multiplier),
                                          (num_iterations / 10, 1e-4 * lr_multiplier),
@@ -118,7 +119,7 @@ def get_session():
 def get_env(seed):
 
 
-    env = cq.Wave1Env()
+    env = cq.Wave1Env(relative_window=(25,25))
     set_global_seeds(seed)
 
     # XXX HOW IMPORTANT IS THIS: ??

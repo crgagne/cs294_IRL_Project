@@ -6,10 +6,10 @@ from gym.utils import seeding
 import numpy as np
 import scipy.misc
 
-SHIP = np.array([1.0,0.0,0.0,0.0])
-CRYSTAL =np.array([0.0,1.0,0.0,0.0])
-ASTEROID = np.array([0.0,0.0,1.0,0.0])
-ALIEN = np.array([0.0,0.0,0.0,1.0])
+SHIP =      np.array([1.0,0.0,0.0,0.0])*255
+CRYSTAL =   np.array([0.0,1.0,0.0,0.0])*255
+ASTEROID =  np.array([0.0,0.0,1.0,0.0])*255
+ALIEN =     np.array([0.0,0.0,0.0,1.0])*255
 
 NONE = np.array([0,0]) # 0
 UP = np.array([0,-1]) # 1
@@ -26,14 +26,15 @@ class Wave1Env(gym.Env):
     metadata = {'render.modes': ['human','rgb_array']}
 
     def __init__(self,verbose=0,
-                    num_crystals=10,
+                    num_crystals=40,
                     num_asteroids=16,
                     num_aliens=2,
                     max_steps=600,
-                    crystal_value=10,
-                    death_value=-100,
+                    crystal_value=50,
+                    death_value=-5,
                     screen_dim=(780,500),
-                    discretize_size=20):
+                    discretize_size=20,
+                    relative_window=None):
         self.viewer = None
         self.verbose = verbose
         self.num_crystals = num_crystals
@@ -53,7 +54,15 @@ class Wave1Env(gym.Env):
         self._seed()
 
         self.action_space = spaces.Discrete(5)
-        self.observation_space = spaces.Box(low=0, high=1, shape=(self.grid_size[0],self.grid_size[1],1))
+        if(relative_window == None):
+            self.observation_space = spaces.Box(low=0, high=1, shape=(self.grid_size[0],self.grid_size[1],4))
+        else:
+            assert type(relative_window) == tuple
+            assert relative_window[0] % 2 == 1 and relative_window[1] % 2 == 1, "window must be odd to be symmetric"
+            self.observation_space = spaces.Box(low=0, high=1, shape=(relative_window[0],relative_window[1],3))
+            self.window_dist = tuple((np.array(relative_window) -1) /2)
+            print(self.window_dist)
+        self.relative_window = relative_window
 
         # self.gate_loc = np.array([self.grid_size[0]/2,self.grid_size[1]])
         # for now let's just move my guy around
@@ -79,15 +88,46 @@ class Wave1Env(gym.Env):
 
         # also we want a 2D observation space for teh DQN
         # the uint8 is for the dqn function (saves memory)
-        obs = np.zeros((self.grid_size[0],self.grid_size[1],1),dtype='uint8')
+        obs = np.zeros((self.grid_size[0],self.grid_size[1],4),dtype='uint8')
         xs, ys = self.ship_location.transpose()
-        obs[xs,ys] = 60
+        obs[xs,ys] = SHIP
         xs, ys = self.crystal_locations.transpose()
-        obs[xs,ys] = 120
+        obs[xs,ys] = CRYSTAL
         xs, ys = self.asteroid_locations.transpose()
-        obs[xs,ys] = 180
+        obs[xs,ys] = ASTEROID
         xs, ys = self.alien_locations.astype(np.int).transpose()
-        obs[xs,ys] = 240
+        obs[xs,ys] = ALIEN
+
+        if(self.relative_window != None):
+            x,y = self.ship_location
+            dx,dy = self.window_dist
+            gx, gy = self.grid_size
+
+            # obs[x,y] = 255
+
+            left = max(x-dx,0)
+            pad_left = left - (x-dx)
+            right = min(x+dx+1,gx)
+            pad_right = (x+dx+1) - right 
+
+            bottom = max(y-dy,0)
+            pad_bottom = bottom - (y-dy)
+            top = min(y+dy+1,gy)
+            pad_top = (y+dy+1) - top
+
+            window = obs[left:right, bottom:top ,1:]
+            # print("WINDOW SLICE",window.shape)
+
+            padtup = [(pad_left,pad_right),(pad_bottom,pad_top),[0,0]]
+            # padtup =
+            # print(padtup)
+            # print(window.shape)
+            obs =np.pad(window,padtup,'constant',constant_values=255)
+
+            # print(obs.shape)
+
+
+
         # 0.0 color will be empty space.
         return obs
 
@@ -129,7 +169,7 @@ class Wave1Env(gym.Env):
         if(self.steps_taken != 0 and self.steps_taken % 5 == 0):
             self.alien_velocities = np.array([2*action_table[np.random.randint(1,5)] for _ in range(self.num_aliens)])
 
-        reward = 0
+        reward = -1
 
         #Check for collisions with crystals
         inds, = (self.ship_location == self.crystal_locations).all(axis=-1).nonzero()
@@ -141,7 +181,7 @@ class Wave1Env(gym.Env):
         hit_alien = np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))
         hit_aster = np.sum((self.ship_location == self.asteroid_locations.astype(np.int)).all(axis=-1))
         if(hit_alien or hit_aster):
-            self.ship_location = np.array([0,0],dtype=np.int) # 1
+            self.ship_location = np.array([19,11],dtype=np.int)#self._random_points(1,self.all_points)[0]#np.array([0,0],dtype=np.int) # 1
             reward += self.death_value
 
         #End after max_steps/10 seconds
@@ -156,7 +196,7 @@ class Wave1Env(gym.Env):
         return select_from[np.random.choice(np.arange(len(select_from)),num,replace=False)]
 
     def _reset(self):
-        self.ship_location = np.array([0,0],dtype=np.int) # 1
+        self.ship_location = np.array([19,11],dtype=np.int)#self._random_points(1,self.all_points)[0]#np.array([0,0],dtype=np.int) # 1
         self.alien_locations = np.array([[38,24],[0,24]],dtype=np.float) #2
         self.alien_velocities = [DOWN*2 for _ in range(self.num_aliens)]#[self._random_vel() for _ in range(2)]
         random_stuff = self._random_points(self.num_crystals+self.num_asteroids,self.acceptable_points)
