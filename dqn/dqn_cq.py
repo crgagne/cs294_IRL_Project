@@ -184,6 +184,7 @@ def learn(env,
     explorations=[]
     time_steps = []
     lrs = []
+    saver = tf.train.Saver()
 
     for t in itertools.count():
         ### 1. Check stopping criterion
@@ -200,6 +201,8 @@ def learn(env,
         epislon = exploration.value(t)
         if not model_initialized or random.random()<epislon:
             action = env.action_space.sample()
+            # action = 0 if np.random.random() < .5 else np.random.randint(low=1,high=num_actions)
+
         else:
             realized_q_val_t = session.run(q_val_t,{obs_t_ph:np.expand_dims(recent_history,axis=0)})
             action = np.argmax(realized_q_val_t)
@@ -318,7 +321,6 @@ def learn(env,
 
 
             episode_rewards = get_wrapper_by_name(env, "Monitor").get_episode_rewards()
-
             savedir = get_wrapper_by_name(env, "Monitor").directory
 
 
@@ -353,3 +355,4 @@ def learn(env,
             np.savetxt(savedir+'/time_steps'+savename+'.txt',np.array(time_steps))
             np.savetxt(savedir+'/explorations'+savename+'.txt',np.array(explorations))
             np.savetxt(savedir+'/lrs'+savename+'.txt',np.array(lrs))
+            saver.save(session,savedir+'/model_weights'+savename+'.ckpt')
