@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<HTMLQuestion xmlns="http://mechanicalturk.amazonaws.com/AWSMechanicalTurkDataSchemas/2011-11-11/HTMLQuestion.xsd">
+  <HTMLContent><![CDATA[
+<!DOCTYPE html>
+<html>
+<link href="https://s3.amazonaws.com/mturk-public/bs30/css/bootstrap.min.css" rel="stylesheet" />
+<section class="container" id="SurveyLink" style="margin-bottom:15px; padding: 10px 10px; font-family: Verdana, Geneva, sans-serif; color:#333333; font-size:0.9em;">
+<div class="row col-xs-12 col-md-12"><!-- Instructions -->
+<div class="panel panel-primary">
+<div class="panel-heading"><strong>Instructions</strong></div>
+
+<div class="panel-body">
+<p>This is a test hit.</p>
+
+<p><strong>Make sure to leave this window open as you complete the task. </strong> When you are finished, you will return to this page to paste the code into the box.</p>
+
+
+</div>
+</div>
+
+<table>
+	<tbody>
+		<tr>
+			<td>Website link:</td>
+			<td>
+			<div id="myelementLink" style="display: inline; font-family: Verdana;"><tt>URL not shown because there is an error with Javascript on your computer. To perform this HIT, you must have Javascript and cookies enabled on your browser.</tt></div>
+			<script type="text/javascript" language="JavaScript"><!--
+var assignment_id_field = document.getElementById('myelementLink');
+var paramstr = window.location.search.substring(1);
+var parampairs = paramstr.split("&");
+var mturkworkerID = "";
+var ass_id = "";
+var hit_id = "";
+
+for (i in parampairs) {
+ var pair = parampairs[i].split("=");
+ if (pair[0] == "workerId"){mturkworkerID = pair[1];}
+ if (pair[0] == "assignmentId"){ass_id = pair[1];}
+ if (pair[0] == "hitId"){hit_id = pair[1];}
+}
+
+
+
+if (mturkworkerID == "" ) {
+ assignment_id_field.innerHTML = '<tt>The link will appear here only if you accept this HIT.</tt>';
+} else {
+ assignment_id_field.innerHTML = '<a target="_blank" href="http://web-experiments-dev.us-west-1.elasticbeanstalk.com/?MID=' + mturkworkerID + '&amp;tasks=${tasks}&amp;cb=${cb}&amp;assign_id=' + ass_id + '&amp;hit_id=' + hit_id + '&breaks=78&cm=0"><h1><span ><span style="font-family: Courier New;"><b>Click here to begin!</b></span></span></h1></a>';
+}
+
+// --></script><script type='text/javascript' src='https://s3.amazonaws.com/mturk-public/externalHIT_v1.js'></script>
+
+			<div class="link" id="linkDiv">&nbsp;</div>
+			</td>
+		</tr>
+		<tr>
+			<td><strong>Provide the completion code Below:</strong></td>
+		</tr>
+	</tbody>
+</table>
+</div>
+
+<form action="https://workersandbox.mturk.com/mturk/externalSubmit" id="mturk_form" method="post" name="mturk_form"><input id="assignmentId" name="assignmentId" type="hidden" value="" />
+<p><textarea cols="80" name="comment" rows="3"></textarea></p>
+
+<p><input id="submitButton" type="submit" value="Submit" /></p>
+</form>
+<script language='Javascript'>turkSetAssignmentID();</script></section>
+<style type="text/css">td {
+ font-size:1.0em;
+ padding:5px 5px;
+}
+</style>
+
+
+</html>
+]]>
+  </HTMLContent>
+  <FrameHeight>450</FrameHeight>
+</HTMLQuestion>

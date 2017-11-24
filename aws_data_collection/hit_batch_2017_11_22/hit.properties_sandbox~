@@ -1,0 +1,52 @@
+######################################
+## Basic HIT Properties
+######################################
+
+title: Psychology Experiments: Decision Making Task
+description: In this HIT, you can participate in several brief tasks hosted on our website. There are 4 questionnaires, which should each take a few minutes. There are also 2 decision making tasks, which take about 20 minutes each.
+keywords:psychology, experiment, decision making, 
+reward:0.01
+assignments:1
+annotation:Psychology Experiment
+
+######################################
+## HIT Timing Properties
+######################################
+
+# this Assignment Duration value is 60 * 60 * 3 = 3 hours
+assignmentduration:10800
+
+# this HIT Lifetime value is 60*60*24*7 = 1 week
+hitlifetime:604800
+
+# this Auto Approval period is 60*60*24*3 = 3 days
+autoapprovaldelay:259200
+
+######################################
+## Qualification Properties
+######################################
+
+
+
+# then uncomment these few lines and comment out the
+#### 
+qualification.1=3TBOPHETGJGMGQT3VDWD9P9CF2HL2W 
+qualification.comparator.1=EqualTo
+qualification.value.1=0
+qualification.private.1=false
+
+# let all demographics through (first is real, second is sandbox)
+qualification.2=3DCMS2BWIWFNXLTA1FNA7TSFL6GCTZ
+qualification.comparator.2=GreaterThanOrEqualTo
+qualification.value.2=0
+qualification.private.2=false
+
+# only workers in US 
+qualification.3=00000000000000000071
+qualification.comparator.3=EqualTo
+qualification.locale.3=US
+
+# only workers with 97% or higher approval rate can do our tasks to avoid scammers
+qualification.4=000000000000000000L0
+qualification.comparator.4=GreaterThanOrEqualTo
+qualification.value.4=97
