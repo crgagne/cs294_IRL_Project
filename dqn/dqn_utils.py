@@ -5,6 +5,32 @@ import tensorflow as tf
 import numpy as np
 import random
 
+def get_available_gpus():
+    from tensorflow.python.client import device_lib
+    local_device_protos = device_lib.list_local_devices()
+    return [x.physical_device_desc for x in local_device_protos if x.device_type == 'GPU']
+
+def set_global_seeds(i):
+    try:
+        import tensorflow as tf
+    except ImportError:
+        pass
+    else:
+        tf.set_random_seed(i)
+    np.random.seed(i)
+    random.seed(i)
+
+def get_session():
+    tf.reset_default_graph()
+    tf_config = tf.ConfigProto(
+        inter_op_parallelism_threads=1,
+        intra_op_parallelism_threads=1)
+    session = tf.Session(config=tf_config)
+    print("AVAILABLE GPUS: ", get_available_gpus())
+    return session
+
+
+
 def huber_loss(x, delta=1.0):
     # https://en.wikipedia.org/wiki/Huber_loss
     return tf.select(
@@ -355,3 +381,53 @@ class ReplayBuffer(object):
         self.action[idx] = action
         self.reward[idx] = reward
         self.done[idx]   = done
+
+
+def stopping_criterion(env, t):
+    # notice that here t is the number of steps of the wrapped env,
+    # which is different from the number of steps in the underlying env
+    #return get_wrapper_by_name(env, "Monitor").get_total_steps() >= num_timesteps
+    num_timesteps=40000000
+    return t >= num_timesteps
+
+
+def sample_env(env,
+    session,
+    q_graph,
+    last_obs,
+    replay_buffer,
+    epsilon,
+    model_initialized,
+    episode_storage):
+
+    # store previous frame or current frame into replay buffer?
+    idx = replay_buffer.store_frame(last_obs)
+
+    # Gets 4 last obs to feed to network..
+    recent_history= replay_buffer.encode_recent_observation()
+
+    # act
+    if not model_initialized or random.random()<epsilon:
+        action = env.action_space.sample()
+    else:
+        action = q_graph.act(recent_history)
+
+    #
+    #realized_q_val_t = q_graph.session.run(q_val_t,{obs_t_ph:np.expand_dims(recent_history2,axis=0)})
+    #prob_action_given_state.append(np.exp(realized_q_val_t-np.sum(realized_q_val_t)))
+
+    # take a step
+    obs, reward, done, info = env.step(action)
+
+    # store effect of action on last obs
+    replay_buffer.store_effect(idx,action,reward,done)
+
+
+    if done:
+        episode_storage['episode_rewards'].append(env.env.episode_rewards)
+        episode_storage['episode_asteroid_collisions'].append(env.env.episode_asteroid_collisions)
+        episode_storage['episode_alien_collisions'].append(env.env.episode_alien_collisions)
+        episode_storage['episode_crystals_captured'].append(env.env.episode_crystals_captured)
+        obs = env.reset()
+    last_obs = obs.copy()
+    return(last_obs,episode_storage)

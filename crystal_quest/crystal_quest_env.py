@@ -5,6 +5,7 @@ from gym import error, spaces, utils
 from gym.utils import seeding
 import numpy as np
 import scipy.misc
+import random
 
 SHIP =      np.array([1.0,0.0,0.0,0.0])*255
 CRYSTAL =   np.array([0.0,1.0,0.0,0.0])*255
@@ -34,7 +35,14 @@ class Wave1Env(gym.Env):
                     death_value=-5,
                     screen_dim=(780,500),
                     discretize_size=20,
-                    relative_window=None):
+                    relative_window=None,
+                    obs_type=0,
+                    reward_func=None,
+                    features=['crystal_captured',
+                    'alien_collision',
+                    'asteroid_collision'],
+                    stochastic_actions=False,
+                    choice_noise=0.1):
         self.viewer = None
         self.verbose = verbose
         self.num_crystals = num_crystals
@@ -44,65 +52,92 @@ class Wave1Env(gym.Env):
         self.crystal_value = crystal_value
         self.death_value = death_value
         self.obs_type = obs_type # 0 for imgs, 1 for coords
-        self.reward=0
-        self.episode_deaths=0
-        self.episode_crystals=0
+        self.reward_func=reward_func
+        self.reward=0 # reward at time t
+
+        # useful features to pass to reward function (for timestep t)
+        self.features = features
+        self.crystal_captured=0
+        self.asteroid_collision=0
+        self.alien_collision=0
+        self.dist_closest_asteroid=None
+        self.dist_closest_alien=None
+        # feature counts for the entire episode
+        self.episode_rewards=0 # should call it episode return
+        self.episode_crystals_captured=0
+        self.episode_asteroid_collisions=0
+        self.episode_alien_collisions=0
+        self.episode_dist_closest_asteroid=0 # incrementally updated average distance to closest asteroid
+        self.episode_dist_closest_alien=0
+
+        # stochastic actions
+        # one way to account for human mistakes is to assume near optimality with
+        # action mistakes, where for example despite pressing up, you continue on your trajecory
+        self.stochastic_actions = stochastic_actions
+        self.choice_noise=choice_noise
 
         self.grid_size = (np.array(screen_dim)/discretize_size).astype('int')
-
         self.all_points = np.array([[(x,y) for x in range(self.grid_size[0])] for y in range(self.grid_size[1])],dtype=np.int).reshape(-1,2)
         self.acceptable_points = np.array([(x,y) for x,y in self.all_points if x > 0 and y > 0],dtype=np.int)
-        #print(len(self.acceptable_points))
-
-        #print(self.all_points.shape)
         self._seed()
-
         self.action_space = spaces.Discrete(5)
-        if(relative_window == None):
+
+        # set up observation type / features
+        if self.obs_type==0:
+            # full image (world centric)
             self.observation_space = spaces.Box(low=0, high=1, shape=(self.grid_size[0],self.grid_size[1],4))
-        else:
+        elif self.obs_type==1:
+            # object coordinates
+            self.observation_space = spaces.Box(low=0, high=256, shape=(4+self.num_crystals*2+self.num_asteroids*2+self.num_aliens*4))
+        elif self.obs_type==2:
+            # distance to nearest asteroid and crystal
+            self.observation_space = spaces.Box(low=0, high=1, shape=(9))
+        elif self.obs_type==3:
+            # relative image (relative to ship)
             assert type(relative_window) == tuple
             assert relative_window[0] % 2 == 1 and relative_window[1] % 2 == 1, "window must be odd to be symmetric"
             self.observation_space = spaces.Box(low=0, high=1, shape=(relative_window[0],relative_window[1],3))
             self.window_dist = tuple((np.array(relative_window) -1) /2)
-            print(self.window_dist)
-        self.relative_window = relative_window
-
-        # self.gate_loc = np.array([self.grid_size[0]/2,self.grid_size[1]])
-        # for now let's just move my guy around
-        # may want to make 4D?
-        # one for crystal, asteroid, alien, ship?
-        # or just 1D with ship =1, crystal=2, asteroid=3, alien=4
-        # if ship and crystal occupy same spot, then it's ship, and reward +=1
-        # if ship and asteroid/alien occupy the same spot then game over..
-
-        # self.min_obj_loc = (.1*self.grid_size).astype(np.int)
-        # self.max_obj_loc = (.9*self.grid_size).astype(np.int)
-
+            self.relative_window = relative_window
 
 
     def _internal_to_observation(self):
-        #obs = np.zeros((self.grid_size[0],self.grid_size[1],4))
-        #obs[self.crystal_locations.astype(np.int)] = CRYSTAL
-        #obs[self.ship_location.astype(np.int)] = SHIP
-        #obs[self.asteroid_locations.astype(np.int)] = ASTEROID
-        #obs[self.alien_locations.astype(np.int)] = ALIEN
-        # this doesn't work?
-        # it returns a grid with lines across it, not things in individual locations.
 
-        # also we want a 2D observation space for teh DQN
-        # the uint8 is for the dqn function (saves memory)
-        obs = np.zeros((self.grid_size[0],self.grid_size[1],4),dtype='uint8')
-        xs, ys = self.ship_location.transpose()
-        obs[xs,ys] = SHIP
-        xs, ys = self.crystal_locations.transpose()
-        obs[xs,ys] = CRYSTAL
-        xs, ys = self.asteroid_locations.transpose()
-        obs[xs,ys] = ASTEROID
-        xs, ys = self.alien_locations.astype(np.int).transpose()
-        obs[xs,ys] = ALIEN
+        if self.obs_type==0 or self.obs_type==3:
+            # full image (world centric)
+            # the uint8 is for the dqn function (saves memory)
+            obs = np.zeros((self.grid_size[0],self.grid_size[1],4),dtype='uint8')
+            xs, ys = self.ship_location.transpose()
+            obs[xs,ys] = SHIP
+            xs, ys = self.crystal_locations.transpose()
+            obs[xs,ys] = CRYSTAL
+            xs, ys = self.asteroid_locations.transpose()
+            obs[xs,ys] = ASTEROID
+            xs, ys = self.alien_locations.astype(np.int).transpose()
+            obs[xs,ys] = ALIEN
+        elif self.obs_type==1:
+            # object coordinates
+            obs = np.concatenate((self.ship_location+10.0,
+                            self.ship_velocity+10.0,
+                            self.crystal_locations.flatten()+10.0,
+                            self.asteroid_locations.flatten()+10.0,
+                            self.alien_locations[0].flatten()+10.0,
+                            self.alien_velocities[0]+10.0)).astype('uint8')
+        elif self.obs_type==2:
+            # distance to nearest asteroid and crystal
+            obs = np.zeros(9)
+            closest = self.crystal_locations[np.argmin(np.sqrt(np.sum(((self.crystal_locations-self.ship_location)**2),axis=1)))]
+            d_to_closest = closest-self.ship_location
+            obs[0:2] = np.abs(d_to_closest)
+            obs[2:4] = np.sign(d_to_closest) # this isn't ideal though because it get's transformed to 255 for -1
+            closest = self.asteroid_locations[np.argmin(np.sqrt(np.sum(((self.asteroid_locations-self.ship_location)**2),axis=1)))]
+            d_to_closest = closest-self.ship_location
+            obs[4:6] = np.abs(d_to_closest)
+            obs[6:8] = np.sign(d_to_closest)
+            obs[8]=self.reward
 
-        if(self.relative_window != None):
+        if self.obs_type==3:
+            # relative image (relative to ship)
             x,y = self.ship_location
             dx,dy = self.window_dist
             gx, gy = self.grid_size
@@ -119,18 +154,13 @@ class Wave1Env(gym.Env):
             top = min(y+dy+1,gy)
             pad_top = (y+dy+1) - top
 
-            window = obs[left:right, bottom:top ,1:]
+            window = obs[int(left):int(right), int(bottom):int(top) ,1:]
             # print("WINDOW SLICE",window.shape)
 
-            padtup = [(pad_left,pad_right),(pad_bottom,pad_top),[0,0]]
-            # padtup =
+            padtup = [(int(pad_left),int(pad_right)),(int(pad_bottom),int(pad_top)),[0,0]]
             # print(padtup)
             # print(window.shape)
             obs =np.pad(window,padtup,'constant',constant_values=255)
-
-            # print(obs.shape)
-
-
 
         # 0.0 color will be empty space.
         return obs
@@ -160,6 +190,13 @@ class Wave1Env(gym.Env):
 
 
     def _step(self, action):
+
+        # stochastic actions, where you fail to press until next time-step
+        # sets action to continue straight despite user's choice 10% of the time
+        if self.stochastic_actions:
+            if random.random()<self.choice_noise:
+                action=0
+
         # update ship's location
         if(action != 0):
             self.ship_velocity = action_table[action]
@@ -169,40 +206,70 @@ class Wave1Env(gym.Env):
         for i in range(len(self.alien_locations)):
             self.alien_locations[i],self.alien_velocities[i] = self._handle_vel(self.alien_locations[i],self.alien_velocities[i])
 
-
+        # update alien velocity
         if(self.steps_taken != 0 and self.steps_taken % 5 == 0):
             self.alien_velocities = np.array([2*action_table[np.random.randint(1,5)] for _ in range(self.num_aliens)])
 
-        reward = -1
+        # calculate distance features
+        # manhatten distance to closest asteroid/alien
+        self.dist_closest_asteroid = np.min([np.sum(np.abs(self.ship_location-ast_loc)) for ast_loc in self.asteroid_locations])
+        self.dist_closest_alien = np.min([np.sum(np.abs(self.ship_location-al_loc)) for al_loc in self.alien_locations])
+        self.episode_dist_closest_alien+=(self.dist_closest_alien-self.episode_dist_closest_alien)/(self.steps_taken+1.0) # calculate average incrementally
+        self.episode_dist_closest_asteroid+=(self.dist_closest_asteroid-self.episode_dist_closest_asteroid)/(self.steps_taken+1.0)
 
-        #Check for collisions with crystals
+        #Check for collisions with crystals (Update feature counts)
         inds, = (self.ship_location == self.crystal_locations).all(axis=-1).nonzero()
         if(len(inds) > 0):
+            self.crystal_captured=1
+            self.episode_crystals_captured+=1
             self.crystal_locations[inds] = self._random_points(len(inds),self.acceptable_points)
-            self.reward += len(inds)*self.crystal_value
-            self.episode_crystals+=1
+        else:
+            self.crystal_captured=0
 
-        #Check for collisions with bad stuff
-        hit_alien = np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))
-        hit_aster = np.sum((self.ship_location == self.asteroid_locations.astype(np.int)).all(axis=-1))
-        if(hit_alien or hit_aster):
+        #Check for collisions with bad stuff (Update feature counts)
+        self.alien_collision = np.sum((self.ship_location == self.alien_locations.astype(np.int)).all(axis=-1))
+        self.episode_alien_collisions+=self.alien_collision
+        self.asteroid_collision = np.sum((self.ship_location == self.asteroid_locations.astype(np.int)).all(axis=-1))
+        self.episode_asteroid_collisions+=self.asteroid_collision
+        assert self.asteroid_collision<2
+        if(self.alien_collision or self.asteroid_collision):
             self.ship_location = np.array([19,11],dtype=np.int)#self._random_points(1,self.all_points)[0]#np.array([0,0],dtype=np.int) # 1
-            reward += self.death_value
 
         #End after max_steps/10 seconds
         end = self.steps_taken >= self.max_steps
 
         #Tick
         self.steps_taken += 1
+
+        # Allow for user specified reward function #
+        # this is a linear reward function on features
+        # could have separate reward function on obs later on
+        if self.reward_func is not None:
+            features = np.array([])
+            for feature in self.features:
+                features=np.append(features,getattr(self,feature))
+            features = features[np.newaxis,:]
+            self.reward = self.reward_func.calculate_reward(features)
+        else:
+            self.reward = -1 # baseline to prevent hiding
+            self.reward += self.crystal_captured*self.crystal_value
+            self.reward += self.asteroid_collision*self.death_value
+            self.reward += self.alien_collision*self.death_value
+
+        self.episode_rewards+=self.reward
+
         return self._internal_to_observation(), self.reward, end, {'misc info': None}
-        #return self._return_img(100), reward, end
+
 
     def _random_points(self,num,select_from):
         return select_from[np.random.choice(np.arange(len(select_from)),num,replace=False)]
 
     def _reset(self):
         self.ship_location = np.array([19,11],dtype=np.int)#self._random_points(1,self.all_points)[0]#np.array([0,0],dtype=np.int) # 1
-        self.alien_locations = np.array([[38,24],[0,24]],dtype=np.float) #2
+        if self.num_aliens==1:
+            self.alien_locations = np.array([[38,24]],dtype=np.float) #2
+        elif self.num_aliens==2:
+            self.alien_locations = np.array([[38,24],[0,24]],dtype=np.float) #2
         self.alien_velocities = [DOWN*2 for _ in range(self.num_aliens)]#[self._random_vel() for _ in range(2)]
         random_stuff = self._random_points(self.num_crystals+self.num_asteroids,self.acceptable_points)
         self.crystal_locations = random_stuff[:self.num_crystals] #(self.min_obj_loc, self.max_obj_loc,self.num_crystals)#np.array([(1,1),(6,4),(8,9),(15,17),(16,21)],dtype=np.int) #3
@@ -211,8 +278,12 @@ class Wave1Env(gym.Env):
         gs = self.grid_size
         self.steps_taken = 0
         self.reward=0
-        self.episode_deaths=0
-        self.episode_crystals=0
+        self.episode_rewards=0
+        self.episode_alien_collisions=0
+        self.episode_crystals_captured=0
+        self.episode_asteroid_collisions=0
+        self.episode_dist_closest_alien=0
+        self.episode_dist_closest_asteroid=0
 
         return self._internal_to_observation()
 
@@ -248,7 +319,6 @@ class Wave1Env(gym.Env):
 
        # needed for gym's video recorder
         if mode == 'rgb_array':
-            #img = self._internal_to_observation()[:,:,0]
             return img
 
         if mode == 'human':
