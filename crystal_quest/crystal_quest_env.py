@@ -42,7 +42,10 @@ class Wave1Env(gym.Env):
                     'alien_collision',
                     'asteroid_collision'],
                     stochastic_actions=False,
-                    choice_noise=0.1):
+                    choice_noise=0.1,
+                    clumping_factor=.45,
+                    num_crystal_clumps=15,
+                    num_asteroid_clumps=5):
         self.viewer = None
         self.verbose = verbose
         self.num_crystals = num_crystals
@@ -54,6 +57,9 @@ class Wave1Env(gym.Env):
         self.obs_type = obs_type # 0 for imgs, 1 for coords
         self.reward_func=reward_func
         self.reward=0 # reward at time t
+        self.clumping_factor=clumping_factor
+        self.num_crystal_clumps=num_crystal_clumps
+        self.num_asteroid_clumps=num_asteroid_clumps
 
         # useful features to pass to reward function (for timestep t)
         self.features = features
@@ -223,6 +229,8 @@ class Wave1Env(gym.Env):
             self.crystal_captured=1
             self.episode_crystals_captured+=1
             self.crystal_locations[inds] = self._random_points(len(inds),self.acceptable_points)
+            print(self.crystal_locations[inds].shape,self.crystal_locations.shape)
+            self.crystal_locations[inds] = self._clump(self.crystal_locations[inds],self.crystal_clumps)
         else:
             self.crystal_captured=0
 
@@ -264,6 +272,15 @@ class Wave1Env(gym.Env):
     def _random_points(self,num,select_from):
         return select_from[np.random.choice(np.arange(len(select_from)),num,replace=False)]
 
+    def _clump(self,locations, clumps):
+        closest_clumps = np.argmin(np.sum((locations.reshape(-1,1,2) - clumps.reshape(1,-1,2))**2,axis=-1),axis=1)
+        print(closest_clumps,locations.shape)
+
+        locations = (1-self.clumping_factor)*locations \
+                    + self.clumping_factor*clumps[closest_clumps]
+        return np.array(locations,np.int)
+
+
     def _reset(self):
         self.ship_location = np.array([19,11],dtype=np.int)#self._random_points(1,self.all_points)[0]#np.array([0,0],dtype=np.int) # 1
         if self.num_aliens==1:
@@ -274,6 +291,20 @@ class Wave1Env(gym.Env):
         random_stuff = self._random_points(self.num_crystals+self.num_asteroids,self.acceptable_points)
         self.crystal_locations = random_stuff[:self.num_crystals] #(self.min_obj_loc, self.max_obj_loc,self.num_crystals)#np.array([(1,1),(6,4),(8,9),(15,17),(16,21)],dtype=np.int) #3
         self.asteroid_locations = random_stuff[self.num_crystals:]#self._random_points(self.min_obj_loc, self.max_obj_loc,self.num_asteroids) #4
+        
+        #Clumping
+        clumps = self._random_points(self.num_crystal_clumps+self.num_asteroid_clumps,self.acceptable_points)
+        self.crystal_clumps = clumps[:self.num_crystal_clumps]
+        self.asteroid_clumps = clumps[:self.num_asteroid_clumps]
+
+        self.crystal_locations = self._clump(self.crystal_locations,self.crystal_clumps)
+        self.asteroid_locations = self._clump(self.asteroid_locations,self.asteroid_clumps)
+        # closest_clumps = np.argmin(np.sum((self.crystal_locations.reshape(-1,1,2) - self.crystal_clumps.reshape(1,-1,2))**2,axis=-1),axis=1)
+        # print(closest_clumps.shape)
+        # self.crystal_locations = (1-self.clumping_factor)*self.crystal_locations \
+        #                           + self.clumping_factor*self.crystal_clumps[closest_clumps]
+        # self.crystal_locations = np.array(self.crystal_locations,np.int)
+
         self.ship_velocity = DOWN
         gs = self.grid_size
         self.steps_taken = 0
