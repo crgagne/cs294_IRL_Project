@@ -35,7 +35,7 @@ def main():
                       obs_type=3,relative_window=(25,25),
                      reward_func=reward_func,features=['crystal_captured',
                         'asteroid_collision',
-                        'alien_collision'],stochastic_actions=False,choice_noise=.05)
+                        'alien_collision'],stochastic_actions=False,choice_noise=.10)
 
     # random seed
     seed = 0
@@ -43,7 +43,7 @@ def main():
     env.seed(seed)
 
     # saving
-    expt_dir ='cq_gr_truth_more_choice_noise5_softmax/'
+    expt_dir ='cq_gr_truth_clustering_and_10p_choice_noise_softmax/'
     #expt_dir ='test/'
     env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
 

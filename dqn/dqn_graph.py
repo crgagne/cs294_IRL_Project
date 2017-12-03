@@ -36,7 +36,10 @@ class QGraph():
         # q values for current s,a
         self.q_val_t = self.q_func(self.obs_t_float, self.num_actions, scope="q_func", reuse=False)
 
-        self.q_probs = tf.exp(self.q_val_t ) / tf.reduce_sum(tf.exp(self.q_val_t ))
+        #self.q_probs = tf.exp(self.q_val_t ) / tf.reduce_sum(tf.exp(self.q_val_t),axis=1) #ah.. it was reducing it across batch and val
+        self.q_probs = tf.nn.softmax(self.q_val_t,dim=1) # #ah.. it was reducing it across batch and val
+
+        print(np.shape(self.q_probs))
 
         # q value for action taken
         self.q_val_t_selected = tf.reduce_sum(self.q_val_t*tf.one_hot(self.act_t_ph,self.num_actions),axis=1)
@@ -56,6 +59,7 @@ class QGraph():
             self.q_val_t_selected_target = self.rew_t_ph + self.gamma*self.q_val_tp1_softmax_masked
         else:
             self.q_val_t_selected_target = self.rew_t_ph + self.gamma*self.q_val_tp1_best_masked
+
 
         # temporal difference error
         self.td_error = self.q_val_t_selected-tf.stop_gradient(self.q_val_t_selected_target)
@@ -110,7 +114,7 @@ class QGraph():
     def act(self,recent_history,soft=True):
         '''returns action by softmax'''
         q_probs = self.session.run(self.q_probs,{self.obs_t_ph:np.expand_dims(recent_history,axis=0)})[0]
-        
+
         try:
             qp = np.random.choice(q_probs,p=q_probs)
             action = np.argmax(q_probs == qp)

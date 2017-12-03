@@ -299,14 +299,14 @@ class Wave1Env(gym.Env):
         elif self.num_aliens==2:
             self.alien_locations = np.array([[38,24],[0,24]],dtype=np.float) #2
         self.alien_velocities = [DOWN*2 for _ in range(self.num_aliens)]#[self._random_vel() for _ in range(2)]
-        
+
         #Clumping
         _,clumps = self._random_points(self.num_crystal_clumps+self.num_asteroid_clumps,self.acceptable_points)
         self.crystal_clumps = clumps[:self.num_crystal_clumps]
         self.asteroid_clumps = clumps[:self.num_asteroid_clumps]
 
         self.object_mask = np.ones(len(self.acceptable_points))
-        
+
 
         probs = self._clumping_probs(self.acceptable_points,self.asteroid_clumps,mask=self.object_mask)
         inds,self.asteroid_locations = self._random_points(self.num_asteroids,self.acceptable_points,p=probs)#self._random_points(self.min_obj_loc, self.max_obj_loc,self.num_asteroids) #4
@@ -321,8 +321,6 @@ class Wave1Env(gym.Env):
         # self.acceptable_points = []
          # random_stuff[:self.num_crystals] #(self.min_obj_loc, self.max_obj_loc,self.num_crystals)#np.array([(1,1),(6,4),(8,9),(15,17),(16,21)],dtype=np.int) #3
         
-
-
 
         # self.crystal_locations = self._clump(self.crystal_locations,self.crystal_clumps)
         # self.asteroid_locations = self._clump(self.asteroid_locations,self.asteroid_clumps)

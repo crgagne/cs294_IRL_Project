@@ -185,6 +185,17 @@ def learn(env,
             episode_rewards = get_wrapper_by_name(env, "Monitor").get_episode_rewards()
             savedir = get_wrapper_by_name(env, "Monitor").directory
 
+            feed_dict = {q_graph.obs_t_ph:obs_t_batch,
+                    q_graph.act_t_ph:act_t_batch,
+                    q_graph.rew_t_ph:rew_batch,
+                    q_graph.obs_tp1_ph:obs_tp1_batch,
+                    q_graph.done_mask_ph:done_mask,
+                    q_graph.learning_rate:learning_rate}
+            print('example q vals')
+            print(session.run(q_graph.q_val_t,feed_dict=feed_dict))
+            print('example q probs')
+            print(session.run(q_graph.q_probs,feed_dict=feed_dict))
+
             if len(episode_rewards) > 0:
                 mean_episode_reward = np.mean(episode_rewards[-100:])
             if len(episode_rewards) > 100:

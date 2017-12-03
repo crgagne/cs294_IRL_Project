@@ -147,7 +147,6 @@ def learn(env,
         # the prob of a trajectory = exponential of reward.
         #print(episode_storage)
 
-
         # Update reward samples (features)
         batch_size=25
         print('updating reward function')
@@ -167,10 +166,22 @@ def learn(env,
 
             # get mini batch of importance weights
             #w = np.array(episode_storage['episode_exp_rew'])[batch_idx_samp]/np.array(episode_storage['episode_prob_traj'][batch_idx_samp])
-            #w = np.array(episode_storage['episode_rewards'])[batch_idx_samp]-np.array(episode_storage['episode_prob_traj'])[batch_idx_samp] # its log prob actually
-            w = np.ones(batch_size)
+            w = np.array(episode_storage['episode_exp_rew'])[batch_idx_samp]-np.array(episode_storage['episode_prob_traj'])[batch_idx_samp] # its log prob actually
+            #w = np.ones(batch_size)
             loss = env.env.reward_func.update(batch_features_demo,
                 batch_features_samp,w)
+
+        feed_dict = {env.env.reward_func.batch_demo_features:batch_features_demo,
+            env.env.reward_func.batch_sample_features:batch_features_samp,
+            env.env.reward_func.w:w[:,np.newaxis],
+            }
+        w= session.run(env.env.reward_func.w,feed_dict=feed_dict)
+
+        print('w')
+        print(w)
+        print('loss')
+        print(loss)
+
         print('batch feature counts expert')
         print(batch_features_demo.mean(axis=0))
         print('batch features counts samples')
@@ -188,6 +199,17 @@ def learn(env,
             #learning_rate = optimizer_spec.lr_schedule.value(t)
             learning_rate = 0.0002
             q_graph.update(obs_t_batch, act_t_batch, rew_batch, obs_tp1_batch, done_mask,learning_rate)
+
+
+        feed_dict = {q_graph.obs_t_ph:obs_t_batch,
+                q_graph.act_t_ph:act_t_batch,
+                q_graph.rew_t_ph:rew_batch,
+                q_graph.obs_tp1_ph:obs_tp1_batch,
+                q_graph.done_mask_ph:done_mask,
+                q_graph.learning_rate:learning_rate}
+        print('example q vals')
+        print(session.run(q_graph.q_val_t,feed_dict=feed_dict))
+        print(session.run(q_graph.q_probs,feed_dict=feed_dict))
 
         # Update Target Network
         print('updating target network')

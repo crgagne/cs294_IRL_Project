@@ -24,8 +24,10 @@ def main():
 
     # set up env (make sure this is the same as ground truth)
     env = cq.Wave1Env(num_aliens=2,num_crystals=20,num_asteroids=20,
-                  obs_type=3,relative_window=(25,25),
-                 reward_func=reward_func)
+                      obs_type=3,relative_window=(25,25),
+                     reward_func=reward_func,features=['crystal_captured',
+                        'asteroid_collision',
+                        'alien_collision'],stochastic_actions=False,choice_noise=.10)
 
     # random seed
     seed = 0 # Use a seed of zero (you may want to randomize the seed!)
@@ -33,12 +35,12 @@ def main():
     env.seed(seed)
 
     # saving
-    expt_dir ='cq_irl_11_29/'
+    expt_dir ='cq_irl_12_3_test/'
     #expt_dir ='test2'
     env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
 
     # load features for each trajectory and truncate to just the last 200 episode (which were the algorithm at optimal perf)
-    './cq'
+    #'./cq'
     crystals = np.loadtxt('cq_gr_truth_more_choice_noise4/gym/episode_crystals_captured2017-11-27-20:35.txt')[-500:-1]
     aliens = np.loadtxt('cq_gr_truth_more_choice_noise4/gym/episode_alien_collisions2017-11-27-20:35.txt')[-500:-1]
     asteroids = np.loadtxt('cq_gr_truth_more_choice_noise4/gym/episode_asteroid_collisions2017-11-27-20:35.txt')[-500:-1]
