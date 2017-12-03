@@ -36,6 +36,8 @@ class QGraph():
         # q values for current s,a
         self.q_val_t = self.q_func(self.obs_t_float, self.num_actions, scope="q_func", reuse=False)
 
+        self.q_probs = tf.exp(self.q_val_t ) / tf.reduce_sum(tf.exp(self.q_val_t ))
+
         # q value for action taken
         self.q_val_t_selected = tf.reduce_sum(self.q_val_t*tf.one_hot(self.act_t_ph,self.num_actions),axis=1)
 
@@ -47,6 +49,7 @@ class QGraph():
 
         # Soft-max next Q-value
         self.q_val_tp1_softmax_masked = tf.log(tf.reduce_sum(tf.exp(self.q_val_tp1),reduction_indices=[1]))*(1.0-self.done_mask_ph)
+
 
         if soft:
             # target (combining reward + next best q-value)
@@ -102,8 +105,20 @@ class QGraph():
     def update_target(self):
         self.session.run(self.update_target_fn)
 
-    def act(self,recent_history):
-        '''returns best action'''
-        '''I should make this soft'''
-        realized_q_val_t = self.session.run(self.q_val_t,{self.obs_t_ph:np.expand_dims(recent_history,axis=0)})
-        return(np.argmax(realized_q_val_t))
+
+
+    def act(self,recent_history,soft=True):
+        '''returns action by softmax'''
+        q_probs = self.session.run(self.q_probs,{self.obs_t_ph:np.expand_dims(recent_history,axis=0)})[0]
+        
+        try:
+            qp = np.random.choice(q_probs,p=q_probs)
+            action = np.argmax(q_probs == qp)
+        except:
+            print('actions did not sum to 1?')
+            print(q_probs)
+            q_probs = np.array([0.2,0.2,0.2,0.2,0.2])
+            qp = np.random.choice(q_probs,p=q_probs)
+            action = np.argmax(q_probs == qp)
+
+        return(action,q_probs)

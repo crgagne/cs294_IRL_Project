@@ -96,7 +96,8 @@ def learn(env,
     num_actions = env.action_space.n
 
     # build Q learner Graph
-    soft=False # push above
+    #soft=False # push above
+    soft=True
     q_graph = QGraph(input_shape,num_actions,q_func,session,gamma,optimizer_spec,grad_norm_clipping)
     q_graph.build_train(soft=soft)
 
@@ -125,13 +126,14 @@ def learn(env,
     episode_storage['episode_asteroid_collisions']=[]
     episode_storage['episode_alien_collisions']=[]
     episode_storage['episode_crystals_captured']=[]
-
+    episode_storage['episode_prob_traj']=[]
+    episode_storage['episode_exp_rew']=[]
+    episode_storage['prob_act']=[]
     saver = tf.train.Saver()
 
     ########################
     # Q-learning Algorithm #
     ########################
-
     for t in itertools.count():
 
         if stopping_criterion is not None and stopping_criterion(env, t):
@@ -196,7 +198,8 @@ def learn(env,
             print("best mean reward %f" % best_mean_episode_reward)
             best_mean_episode_rewards.append(best_mean_episode_reward)
             print("episodes %d" % len(episode_rewards))
-            print("exploration %f" % exploration.value(t))
+            #print("exploration %f" % exploration.value(t))
+            print("exploration soft")
             explorations.append(exploration.value(t))
             print("learning_rate %f" % optimizer_spec.lr_schedule.value(t))
             lrs.append(optimizer_spec.lr_schedule.value(t))

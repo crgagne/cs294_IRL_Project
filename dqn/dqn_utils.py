@@ -407,14 +407,13 @@ def sample_env(env,
     recent_history= replay_buffer.encode_recent_observation()
 
     # act
-    if not model_initialized or random.random()<epsilon:
+    if not model_initialized:
         action = env.action_space.sample()
+        prob_actions = np.empty(5)
     else:
-        action = q_graph.act(recent_history)
+        action,prob_actions = q_graph.act(recent_history)
 
-    #
-    #realized_q_val_t = q_graph.session.run(q_val_t,{obs_t_ph:np.expand_dims(recent_history2,axis=0)})
-    #prob_action_given_state.append(np.exp(realized_q_val_t-np.sum(realized_q_val_t)))
+    episode_storage['prob_act'].append(prob_actions[action])
 
     # take a step
     obs, reward, done, info = env.step(action)
@@ -422,12 +421,19 @@ def sample_env(env,
     # store effect of action on last obs
     replay_buffer.store_effect(idx,action,reward,done)
 
-
     if done:
-        episode_storage['episode_rewards'].append(env.env.episode_rewards)
+        episode_storage['episode_rewards'].append(env.env.episode_rewards[0][0])
         episode_storage['episode_asteroid_collisions'].append(env.env.episode_asteroid_collisions)
         episode_storage['episode_alien_collisions'].append(env.env.episode_alien_collisions)
         episode_storage['episode_crystals_captured'].append(env.env.episode_crystals_captured)
+        episode_storage['episode_prob_traj'].append(np.sum(np.log(episode_storage['prob_act']))) # log prob
+        features = np.array([env.env.episode_crystals_captured,env.env.episode_asteroid_collisions,env.env.episode_alien_collisions])
+        episode_storage['episode_exp_rew'].append(env.env.reward_func.calculate_reward(features[np.newaxis,:])[0][0])
+        episode_storage['prob_act']=[]
+        #print(episode_storage)
+
         obs = env.reset()
+
     last_obs = obs.copy()
+
     return(last_obs,episode_storage)

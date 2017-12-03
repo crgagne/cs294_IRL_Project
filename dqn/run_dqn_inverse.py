@@ -10,7 +10,7 @@ import sys
 sys.path.append('../crystal_quest/')
 import crystal_quest_env as cq
 from reward_functions import *
-from dqn_inverse import *
+from dqn_inverse2 import *
 from models import *
 
 
@@ -33,15 +33,16 @@ def main():
     env.seed(seed)
 
     # saving
-    expt_dir ='cq_irl_refactored1/'
-    expt_dir ='test2'
+    expt_dir ='cq_irl_11_29/'
+    #expt_dir ='test2'
     env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
 
     # load features for each trajectory and truncate to just the last 200 episode (which were the algorithm at optimal perf)
-    crystals = np.loadtxt('../dqn/cq_gr_truth1/gym/episode_crystals2017-11-25-15:50.txt')[-200:-1]
-    aliens = np.loadtxt('../dqn/cq_gr_truth1/gym/episode_alien_collisions2017-11-25-15:50.txt')[-200:-1]
-    asteroids = np.loadtxt('../dqn/cq_gr_truth1/gym/episode_asteroid_collisions2017-11-25-15:50.txt')[-200:-1]
-    features_demo = np.vstack((crystals,aliens,asteroids)).T
+    './cq'
+    crystals = np.loadtxt('cq_gr_truth_more_choice_noise4/gym/episode_crystals_captured2017-11-27-20:35.txt')[-500:-1]
+    aliens = np.loadtxt('cq_gr_truth_more_choice_noise4/gym/episode_alien_collisions2017-11-27-20:35.txt')[-500:-1]
+    asteroids = np.loadtxt('cq_gr_truth_more_choice_noise4/gym/episode_asteroid_collisions2017-11-27-20:35.txt')[-500:-1]
+    features_demo = np.vstack((crystals,asteroids,aliens)).T
 
     #  randomly initialize reward
     tf.global_variables_initializer().run(session=session)
@@ -49,6 +50,7 @@ def main():
     phi_init = np.random.random(3)
     reward_func.set_phi(phi_init)
 
+    q_func = conv_model_small
     q_func = conv_model_tiny
 
     num_timesteps=40000000
@@ -56,6 +58,8 @@ def main():
 
     # leanring rate
     lr_multiplier = 2.0
+
+    # XXX make w.r.t to outer loop
     lr_schedule = PiecewiseSchedule([
                                          (0,                   1e-4 * lr_multiplier),
                                          (num_iterations / 10, 1e-4 * lr_multiplier),

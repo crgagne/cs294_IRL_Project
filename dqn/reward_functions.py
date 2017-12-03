@@ -24,8 +24,7 @@ class LinearRewardFunction():
         self.features = tf.placeholder(tf.float32, [None] + [self.num_features]) # first dim is for batch
         self.phi = tf.Variable(tf.zeros([self.num_features]))
         self.b = tf.Variable(tf.zeros([1]))
-        self.reward = tf.matmul(self.features,tf.expand_dims(self.phi,1)) #+ self.b
-        # XXX consider whether we need a bias, or whether we need to constrain the rewards
+        self.reward = tf.matmul(self.features,tf.expand_dims(self.phi,1))
 
 
         self.batch_demo_features=tf.placeholder(tf.float32, [None] + [self.num_features]) # first dim is for batch
@@ -34,7 +33,8 @@ class LinearRewardFunction():
         self.samp_r  = tf.matmul(self.batch_sample_features,tf.expand_dims(self.phi,1))
         # weights for sampled trajectories (if not using, will just be 1's)
         self.w = tf.placeholder(tf.float32, [None]+[1])
-        self.irl_loss = tf.reduce_mean(self.demo_r)-tf.reduce_mean(self.samp_r/self.w)
+        #self.irl_loss = tf.reduce_mean(self.demo_r)-tf.reduce_mean(self.w*self.samp_r)/tf.reduce_sum(self.w)
+        self.irl_loss = tf.reduce_mean(self.demo_r)-tf.reduce_mean(self.samp_r)
         self.train_op = tf.train.GradientDescentOptimizer(self.learning_rate).minimize(-1.0*self.irl_loss)
 
     def set_phi(self,phi,b=np.array([0.0])):
