@@ -1,0 +1,2 @@
+model_checkpoint_path: "/Users/chris/Desktop/irl_project/dqn/cq_gr_truth_more_choice_noise5_softmax/gym/model_weights2017-11-28-14:07.ckpt"
+all_model_checkpoint_paths: "/Users/chris/Desktop/irl_project/dqn/cq_gr_truth_more_choice_noise5_softmax/gym/model_weights2017-11-28-14:07.ckpt"
