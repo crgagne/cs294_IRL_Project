@@ -10,9 +10,9 @@ import sys
 sys.path.append('../crystal_quest/')
 import crystal_quest_env as cq
 from reward_functions import *
-from dqn_inverse2 import *
+from dqn_inverse import *
 from models import *
-
+import glob
 
 def main():
 
@@ -20,30 +20,36 @@ def main():
     session = get_session()
 
     # set up reward function (specify number of features)
-    reward_func = LinearRewardFunction(session)
+    reward_func = LinearRewardFunction(session,learning_rate=0.0001)
 
     # set up env (make sure this is the same as ground truth)
-    env = cq.Wave1Env(num_aliens=2,num_crystals=20,num_asteroids=20,
-                      obs_type=3,relative_window=(25,25),
+    env = cq.Wave1Env(num_aliens=2,num_crystals=40,num_asteroids=30,
+                      obs_type=3,relative_window=(25,25),max_steps=100,
                      reward_func=reward_func,features=['crystal_captured',
                         'asteroid_collision',
-                        'alien_collision'],stochastic_actions=False,choice_noise=.10)
+                        'alien_collision'],stochastic_actions=True,choice_noise=0.15,clumping_factor=1.5,
+                        num_crystal_clumps=2,
+                        num_asteroid_clumps=2)
 
     # random seed
     seed = 0 # Use a seed of zero (you may want to randomize the seed!)
     set_global_seeds(seed)
     env.seed(seed)
 
-    # saving
-    expt_dir ='cq_irl_12_3_test/'
-    #expt_dir ='test2'
-    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
+    #expt_dir ='cq_irl_safer_clust1.5_cn15_tiny_tmp0.1_100steps_b/'
+    #expert_dir = 'cq_grt_safer_clust1.5_cn15_tiny_tmp0.1_100steps/'
 
-    # load features for each trajectory and truncate to just the last 200 episode (which were the algorithm at optimal perf)
-    #'./cq'
-    crystals = np.loadtxt('cq_gr_truth_more_choice_noise4/gym/episode_crystals_captured2017-11-27-20:35.txt')[-500:-1]
-    aliens = np.loadtxt('cq_gr_truth_more_choice_noise4/gym/episode_alien_collisions2017-11-27-20:35.txt')[-500:-1]
-    asteroids = np.loadtxt('cq_gr_truth_more_choice_noise4/gym/episode_asteroid_collisions2017-11-27-20:35.txt')[-500:-1]
+    expt_dir ='cq_irl_riskier_clust1.5_cn15_tiny_tmp0.1_100steps_b/'
+    expert_dir = 'cq_grt_riskier_clust1.5_cn15_tiny_tmp0.1_100steps/'
+
+    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True,video_callable=video_schedule)
+
+
+    # load expert features
+    which=0
+    crystals = np.loadtxt(sorted(glob.glob(expert_dir+'/gym/*crystals*'))[which])[-1000:]
+    aliens = np.loadtxt(sorted(glob.glob(expert_dir+'/gym/*alien*'))[which])[-1000:]
+    asteroids = np.loadtxt(sorted(glob.glob(expert_dir+'/gym/*asteroid*'))[which])[-1000:]
     features_demo = np.vstack((crystals,asteroids,aliens)).T
 
     #  randomly initialize reward
@@ -52,16 +58,15 @@ def main():
     phi_init = np.random.random(3)
     reward_func.set_phi(phi_init)
 
-    q_func = conv_model_small
     q_func = conv_model_tiny
 
     num_timesteps=40000000
     num_iterations = float(num_timesteps) / 4.0
 
     # leanring rate
-    lr_multiplier = 2.0
+    lr_multiplier = 4.0
 
-    # XXX make w.r.t to outer loop
+    #
     lr_schedule = PiecewiseSchedule([
                                          (0,                   1e-4 * lr_multiplier),
                                          (num_iterations / 10, 1e-4 * lr_multiplier),

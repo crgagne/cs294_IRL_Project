@@ -45,7 +45,8 @@ class Wave1Env(gym.Env):
                     choice_noise=0.1,
                     clumping_factor=2.25,
                     num_crystal_clumps=15,
-                    num_asteroid_clumps=5):
+                    num_asteroid_clumps=5,
+                    proportion_clumped=.8):
         self.viewer = None
         self.verbose = verbose
         self.num_crystals = num_crystals
@@ -60,6 +61,7 @@ class Wave1Env(gym.Env):
         self.clumping_factor=clumping_factor
         self.num_crystal_clumps=num_crystal_clumps
         self.num_asteroid_clumps=num_asteroid_clumps
+        self.proportion_clumped=proportion_clumped
 
         # useful features to pass to reward function (for timestep t)
         self.features = features
@@ -201,7 +203,7 @@ class Wave1Env(gym.Env):
         # sets action to continue straight despite user's choice 10% of the time
         if self.stochastic_actions:
             if random.random()<self.choice_noise:
-                action=0
+                action=np.random.randint(5)
 
         # update ship's location
         if(action != 0):
@@ -301,9 +303,14 @@ class Wave1Env(gym.Env):
         self.alien_velocities = [DOWN*2 for _ in range(self.num_aliens)]#[self._random_vel() for _ in range(2)]
 
         #Clumping
-        _,clumps = self._random_points(self.num_crystal_clumps+self.num_asteroid_clumps,self.acceptable_points)
-        self.crystal_clumps = clumps[:self.num_crystal_clumps]
-        self.asteroid_clumps = clumps[:self.num_asteroid_clumps]
+        #_,clumps = self._random_points(self.num_crystal_clumps+self.num_asteroid_clumps,self.acceptable_points)
+        #self.crystal_clumps = clumps[:self.num_crystal_clumps]
+        #self.asteroid_clumps = clumps[:self.num_asteroid_clumps]
+
+        # clumping in the same areas
+        _,clumps = self._random_points(self.num_asteroid_clumps,self.acceptable_points)
+        self.crystal_clumps = clumps
+        self.asteroid_clumps = clumps
 
         self.object_mask = np.ones(len(self.acceptable_points))
 
@@ -314,13 +321,18 @@ class Wave1Env(gym.Env):
 
         probs = self._clumping_probs(self.acceptable_points,self.crystal_clumps,mask=self.object_mask)
         self.new_crystal_probs = probs
-        inds,self.crystal_locations = self._random_points(self.num_crystals,self.acceptable_points,p=probs)
+
+        proportion_clustered=np.round(self.num_crystals*self.proportion_clumped).astype('int')
+        _,cl_clust= self._random_points(proportion_clustered,self.acceptable_points,p=probs)
+        _,cl_nonclust = self._random_points(self.num_crystals-proportion_clustered,self.acceptable_points)
+        self.crystal_locations = np.concatenate((cl_clust,cl_nonclust))
+
         self.object_mask[inds] = 0.0
 
         # self.new_crystal_probs = self._clumping_probs(self.acceptable_points,self.crystal_clumps)
         # self.acceptable_points = []
          # random_stuff[:self.num_crystals] #(self.min_obj_loc, self.max_obj_loc,self.num_crystals)#np.array([(1,1),(6,4),(8,9),(15,17),(16,21)],dtype=np.int) #3
-        
+
 
         # self.crystal_locations = self._clump(self.crystal_locations,self.crystal_clumps)
         # self.asteroid_locations = self._clump(self.asteroid_locations,self.asteroid_clumps)

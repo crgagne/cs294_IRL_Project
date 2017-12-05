@@ -127,6 +127,7 @@ def learn(env,
     episode_storage['episode_alien_collisions']=[]
     episode_storage['episode_crystals_captured']=[]
     episode_storage['episode_prob_traj']=[]
+    episode_storage['episode_prob_traj_prod']=[]
     episode_storage['episode_exp_rew']=[]
     episode_storage['prob_act']=[]
     saver = tf.train.Saver()
@@ -218,7 +219,9 @@ def learn(env,
             print('mean episode crystals %d' % np.mean(episode_storage['episode_crystals_captured'][-50:]))
             print('mean episode alien collisions %d' % np.mean(episode_storage['episode_alien_collisions'][-50:]))
             print('mean episode asteroid collisions %d' % np.mean(episode_storage['episode_asteroid_collisions'][-50:]))
-
+            print('phi:')
+            print(session.run(env.env.reward_func.phi))
+            
             sys.stdout.flush()
             savename = date_string
             np.savetxt(savedir+'/mean_episode_rewards'+savename+'.txt',np.array(mean_episode_rewards))

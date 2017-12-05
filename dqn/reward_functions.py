@@ -33,7 +33,7 @@ class LinearRewardFunction():
         self.samp_r  = tf.matmul(self.batch_sample_features,tf.expand_dims(self.phi,1))
         # weights for sampled trajectories (if not using, will just be 1's)
         self.w = tf.placeholder(tf.float32, [None]+[1])
-        self.irl_loss = tf.reduce_mean(self.demo_r)-tf.reduce_mean(self.w*self.samp_r)/tf.reduce_sum(self.w)
+        self.irl_loss = tf.reduce_mean(self.demo_r)-tf.reduce_sum(self.w*self.samp_r)/tf.reduce_sum(self.w)
         #self.irl_loss = tf.reduce_mean(self.demo_r)-tf.reduce_mean(self.samp_r)
         self.train_op = tf.train.GradientDescentOptimizer(self.learning_rate).minimize(-1.0*self.irl_loss)
 

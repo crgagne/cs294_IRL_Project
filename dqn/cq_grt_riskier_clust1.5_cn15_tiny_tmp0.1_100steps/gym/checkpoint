@@ -1,0 +1,2 @@
+model_checkpoint_path: "/Users/chris/Desktop/irl_project/dqn/cq_grt_riskier_clust1.5_cn15_tiny_tmp0.1_100steps/gym/model_weights2017-12-04-01:30.ckpt"
+all_model_checkpoint_paths: "/Users/chris/Desktop/irl_project/dqn/cq_grt_riskier_clust1.5_cn15_tiny_tmp0.1_100steps/gym/model_weights2017-12-04-01:30.ckpt"

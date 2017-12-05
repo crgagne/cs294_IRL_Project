@@ -12,7 +12,7 @@ class QGraph():
         input_shape,
         num_actions,
         q_func,
-        session,gamma,optimizer_spec,grad_norm_clipping):
+        session,gamma,optimizer_spec,grad_norm_clipping,temp=0.1):
         self.input_shape = input_shape
         self.num_actions = num_actions
         self.session=session
@@ -25,7 +25,8 @@ class QGraph():
         self.rew_t_ph              = tf.placeholder(tf.float32, [None])
         self.obs_tp1_ph            = tf.placeholder(tf.uint8, [None] + list(input_shape))
         self.done_mask_ph          = tf.placeholder(tf.float32, [None])
-
+        #self.temp = tf.placeholder(shape=None,dtype=tf.float32)
+        self.temp = temp
         # casting to float on GPU ensures lower data transfer times.
         self.obs_t_float   = tf.cast(self.obs_t_ph,   tf.float32) / 255.0
         self.obs_tp1_float = tf.cast(self.obs_tp1_ph, tf.float32) / 255.0
@@ -37,7 +38,7 @@ class QGraph():
         self.q_val_t = self.q_func(self.obs_t_float, self.num_actions, scope="q_func", reuse=False)
 
         #self.q_probs = tf.exp(self.q_val_t ) / tf.reduce_sum(tf.exp(self.q_val_t),axis=1) #ah.. it was reducing it across batch and val
-        self.q_probs = tf.nn.softmax(self.q_val_t,dim=1) # #ah.. it was reducing it across batch and val
+        self.q_probs = tf.nn.softmax(self.q_val_t/self.temp,dim=1) # #ah.. it was reducing it across batch and val
 
         print(np.shape(self.q_probs))
 
@@ -50,15 +51,14 @@ class QGraph():
         # Max next q value (masked to 0 if done)
         self.q_val_tp1_best_masked = tf.reduce_max(self.q_val_tp1,reduction_indices=[1])*(1.0-self.done_mask_ph) ### done mask ****
 
-        # Soft-max next Q-value
-        self.q_val_tp1_softmax_masked = tf.log(tf.reduce_sum(tf.exp(self.q_val_tp1),reduction_indices=[1]))*(1.0-self.done_mask_ph)
+        # Soft-max next Q-value (removing . )
+        # can't believe they have this function built in (this will hopefully solve my underflow/overflow issues)
+        #self.q_val_tp1_softmax_masked = tf.reduce_logsumexp(self.q_val_tp1,axis=1)*(1.0-self.done_mask_ph)
 
-
-        if soft:
-            # target (combining reward + next best q-value)
-            self.q_val_t_selected_target = self.rew_t_ph + self.gamma*self.q_val_tp1_softmax_masked
-        else:
-            self.q_val_t_selected_target = self.rew_t_ph + self.gamma*self.q_val_tp1_best_masked
+        #if soft:
+        #    self.q_val_t_selected_target = self.rew_t_ph + self.gamma*self.q_val_tp1_softmax_masked
+        #else:
+        self.q_val_t_selected_target = self.rew_t_ph + self.gamma*self.q_val_tp1_best_masked
 
 
         # temporal difference error
@@ -114,15 +114,7 @@ class QGraph():
     def act(self,recent_history,soft=True):
         '''returns action by softmax'''
         q_probs = self.session.run(self.q_probs,{self.obs_t_ph:np.expand_dims(recent_history,axis=0)})[0]
-
-        try:
-            qp = np.random.choice(q_probs,p=q_probs)
-            action = np.argmax(q_probs == qp)
-        except:
-            print('actions did not sum to 1?')
-            print(q_probs)
-            q_probs = np.array([0.2,0.2,0.2,0.2,0.2])
-            qp = np.random.choice(q_probs,p=q_probs)
-            action = np.argmax(q_probs == qp)
+        qp = np.random.choice(q_probs,p=q_probs)
+        action = np.argmax(q_probs == qp)
 
         return(action,q_probs)

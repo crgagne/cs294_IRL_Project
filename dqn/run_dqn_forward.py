@@ -23,19 +23,13 @@ def main():
     reward_func = LinearRewardFunction(session,num_features=3)
 
     # set up env
-    #env = cq.Wave1Env(num_aliens=2,num_crystals=20,num_asteroids=20,
-    #                  obs_type=3,relative_window=(25,25),
-    #                 reward_func=reward_func,features=['crystal_captured',
-    #                    'asteroid_collision',
-    #                    'alien_collision',
-    #                  'dist_closest_asteroid',
-    #                 'dist_closest_alien'],stochastic_actions=False,choice_noise=.20)
-
-    env = cq.Wave1Env(num_aliens=2,num_crystals=20,num_asteroids=20,
-                      obs_type=3,relative_window=(25,25),
+    env = cq.Wave1Env(num_aliens=2,num_crystals=40,num_asteroids=30,
+                      obs_type=3,relative_window=(25,25),max_steps=100,
                      reward_func=reward_func,features=['crystal_captured',
                         'asteroid_collision',
-                        'alien_collision'],stochastic_actions=False,choice_noise=.10)
+                        'alien_collision'],stochastic_actions=True,choice_noise=0.15,clumping_factor=1.5,
+                        num_crystal_clumps=2,
+                        num_asteroid_clumps=2)
 
     # random seed
     seed = 0
@@ -43,24 +37,31 @@ def main():
     env.seed(seed)
 
     # saving
-    expt_dir ='cq_gr_truth_clustering_and_10p_choice_noise_softmax/'
-    #expt_dir ='test/'
-    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
+    #expt_dir ='cq_grt_risky_clust1.5_and_10p_cn15_soft_tiny/'
+    #expt_dir ='cq_grt_safer_clust1.5_and_10p_cn15_soft_tiny/'
+
+    expt_dir ='cq_grt_safer_clust1.5_cn15_tiny_tmp0.1_100steps/'
+    expt_dir ='cq_grt_safer_wneg3_clust1.5_cn15_tiny_tmp0.1_100steps/'
+
+    #expt_dir ='cq_grt_neut_clust1.5_cn15_tiny_tmp0.1_100steps/'
+    #expt_dir ='cq_grt_riskier_clust1.5_cn15_tiny_tmp0.1_100steps/'
+
+    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True,video_callable=video_schedule)
 
     # intialize session for the reward function
     # ends up getting re-initalized later
     tf.global_variables_initializer().run(session=session)
 
     # set the ground truth
-    #gt_reward = np.array([2.0,-1.0,-1.0])
-    gt_reward = np.array([10.0,-20.0,-20.0,0.05,0.05])
-    #gt_reward = np.array([5.0,0.0,0.0])
-    gt_reward = np.array([5.0,-50.0,-50.0])
-    gt_reward = np.array([5.0,-1.0,-1.0])
+    gt_reward = np.array([1.0,-3.0,-3.0])
+    #gt_reward = np.array([1.0,-1.0,-1.0])
+    #gt_reward = np.array([1.0,-0.1,-0.1])
+
+
     reward_func.set_phi(gt_reward)
 
     # Set up q function (imported from models)
-    q_func = conv_model_small
+    q_func = conv_model_tiny
 
     #
     num_timesteps=40000000
@@ -69,7 +70,7 @@ def main():
     num_iterations = float(num_timesteps) / 4.0
 
     # Set up a learning rate schedule
-    lr_multiplier = 3.0
+    lr_multiplier = 4.0
     lr_schedule = PiecewiseSchedule([
                                     (0,                   1e-4 * lr_multiplier),
                                     (num_iterations / 10, 1e-4 * lr_multiplier),
@@ -99,7 +100,7 @@ def main():
         gt_reward=gt_reward,
         exploration=exploration_schedule,
         stopping_criterion=stopping_criterion,
-        replay_buffer_size=50000, # vs 1e6 to save memory space
+        replay_buffer_size=500000, # vs 1e6 to save memory space
         batch_size=32,
         gamma=0.99,
         learning_starts=50000,#500000

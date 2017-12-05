@@ -5,6 +5,10 @@ import tensorflow as tf
 import numpy as np
 import random
 
+def video_schedule(episode_id,freq=100):
+    return episode_id % freq == 0
+
+
 def get_available_gpus():
     from tensorflow.python.client import device_lib
     local_device_protos = device_lib.list_local_devices()
@@ -427,6 +431,7 @@ def sample_env(env,
         episode_storage['episode_alien_collisions'].append(env.env.episode_alien_collisions)
         episode_storage['episode_crystals_captured'].append(env.env.episode_crystals_captured)
         episode_storage['episode_prob_traj'].append(np.sum(np.log(episode_storage['prob_act']))) # log prob
+        episode_storage['episode_prob_traj_prod'].append(np.prod(episode_storage['prob_act'])) # log prob
         features = np.array([env.env.episode_crystals_captured,env.env.episode_asteroid_collisions,env.env.episode_alien_collisions])
         episode_storage['episode_exp_rew'].append(env.env.reward_func.calculate_reward(features[np.newaxis,:])[0][0])
         episode_storage['prob_act']=[]
